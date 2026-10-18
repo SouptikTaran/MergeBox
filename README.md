@@ -33,6 +33,11 @@ it across deployments; it is needed to decrypt existing connected-account tokens
 No Google KMS is used. Call `POST /api/drive/accounts/connect` with the session,
 Origin, and CSRF header, then navigate to the returned `authorizationUrl`.
 `GET /api/drive/accounts` returns safe account summaries.
+`DELETE /api/drive/accounts/:id` disables access immediately and revokes the grant.
+A 202 response means revocation is pending: the backend retries every minute and
+retains encrypted credentials for at most 24 hours, then removes them even if Google
+is unavailable. Users can also revoke access directly in Google Account settings.
+An expired/revoked refresh token changes the account status to `reconnect`.
 
 Run `yarn db:migrate` from `backend/`, then `yarn dev`. Open
 `http://localhost:8000/api/auth/google` to sign in. The callback returns to the

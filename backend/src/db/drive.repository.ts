@@ -101,6 +101,55 @@ export function createDriveRepository(
         .delete(driveAccounts)
         .where(and(eq(driveAccounts.id, id), eq(driveAccounts.userId, userId)));
     },
+    async markReconnect(userId: string, id: string) {
+      await db
+        .update(driveAccounts)
+        .set({ status: 'reconnect', updatedAt: new Date() })
+        .where(
+          and(
+            eq(driveAccounts.id, id),
+            eq(driveAccounts.userId, userId),
+            eq(driveAccounts.status, 'active'),
+          ),
+        );
+    },
+    async beginDisconnect(userId: string, id: string) {
+      return db.transaction(async (tx) => {
+        await tx
+          .update(driveAccounts)
+          .set({ status: 'disconnecting', updatedAt: new Date() })
+          .where(
+            and(
+              eq(driveAccounts.id, id),
+              eq(driveAccounts.userId, userId),
+              inArray(driveAccounts.status, ['active', 'reconnect']),
+            ),
+          );
+        await tx
+          .delete(oauthTransactions)
+          .where(
+            and(
+              eq(oauthTransactions.userId, userId),
+              eq(oauthTransactions.intent, 'connect_drive'),
+            ),
+          );
+        const [account] = await tx
+          .select()
+          .from(driveAccounts)
+          .where(
+            and(eq(driveAccounts.id, id), eq(driveAccounts.userId, userId)),
+          );
+        return account ?? null;
+      });
+    },
+    async pendingDisconnects() {
+      return db
+        .select()
+        .from(driveAccounts)
+        .where(eq(driveAccounts.status, 'disconnecting'))
+        .orderBy(driveAccounts.updatedAt)
+        .limit(20);
+    },
   };
 }
 export type DriveRepository = ReturnType<typeof createDriveRepository>;

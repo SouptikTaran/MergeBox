@@ -16,11 +16,14 @@ function createHarness() {
   const schema = require('../../dist/db/schema');
   const { createDriveRepository } = require('../../dist/db/drive.repository');
   const {
+    createDriveAccess,
+  } = require('../../dist/services/drive-access.service');
+  const {
     createTokenEncryption,
   } = require('../../dist/services/token-encryption.service');
   const { randomBytes } = require('node:crypto');
   const encryption = createTokenEncryption(randomBytes(32).toString('base64'));
-  let pg, db, store, server, base, simulator, upstream;
+  let pg, db, store, server, base, simulator, upstream, access;
   const config = {
     clientId: 'test-client',
     clientSecret: 'test-secret',
@@ -55,9 +58,17 @@ function createHarness() {
       },
       600,
     );
+    access = createDriveAccess(
+      createDriveRepository(db),
+      encryption,
+      current,
+      { token: `${upstream}/token`, revoke: `${upstream}/revoke` },
+      600,
+    );
     server = createApp(store, provider, current, {
       repository: createDriveRepository(db),
       encryption,
+      access,
       google: createGoogleProvider(
         current,
         {
@@ -135,6 +146,9 @@ function createHarness() {
   }
 
   return {
+    get access() {
+      return access;
+    },
     config,
     request,
     cookie,

@@ -7,6 +7,7 @@ import type { GoogleProvider } from '../services/google.service';
 import type { TokenEncryption } from '../services/token-encryption.service';
 import { hash, isToken, randomToken } from '../utils/auth.util';
 import { HttpError } from '../utils/http-error.util';
+import type { DriveAccess } from '../services/drive-access.service';
 
 export const DRIVE_SCOPE =
   'https://www.googleapis.com/auth/drive.metadata.readonly';
@@ -19,6 +20,7 @@ export function createDriveController(
   google: GoogleProvider,
   encryption: TokenEncryption,
   config: AuthConfig,
+  access: DriveAccess,
 ) {
   const cookieName = config.production
     ? '__Host-drivepool_drive_oauth'
@@ -170,5 +172,22 @@ export function createDriveController(
       })),
     });
   }
-  return { connect, callback, list };
+  async function disconnect(req: Request, res: Response) {
+    if (!isUuid(req.params.id))
+      throw new HttpError(404, 'account_not_found', 'Account not found.');
+    const complete = await access.disconnect(
+      sessionContext(res).userId,
+      req.params.id,
+    );
+    if (complete) res.status(204).end();
+    else
+      res
+        .status(202)
+        .json({
+          status: 'disconnecting',
+          message:
+            'Local access disabled. Google revocation is pending; credentials are retained for retries for up to 24 hours. You can also revoke access in Google Account settings.',
+        });
+  }
+  return { connect, callback, list, disconnect };
 }

@@ -57,8 +57,33 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(302, { Location: callback.toString() });
       return res.end();
     }
+    if (url.pathname === '/revoke' && req.method === 'POST') {
+      const p = await body(req);
+      if (p.get('token') === 'refresh-revoke-failure')
+        return send(res, 503, { error: 'temporarily_unavailable' });
+      if (p.get('token') === 'refresh-already-revoked')
+        return send(res, 400, { error: 'invalid_token' });
+      return send(res, 200, {});
+    }
     if (url.pathname === '/token' && req.method === 'POST') {
       const p = await body(req);
+      if (p.get('grant_type') === 'refresh_token') {
+        if (
+          p.get('client_id') !== 'test-client' ||
+          p.get('client_secret') !== 'test-secret'
+        )
+          return send(res, 400, { error: 'invalid_client' });
+        const token = p.get('refresh_token') || '';
+        if (token === 'refresh-revoked')
+          return send(res, 400, { error: 'invalid_grant' });
+        if (token === 'refresh-refresh-outage')
+          return send(res, 503, { error: 'temporarily_unavailable' });
+        return send(res, 200, {
+          access_token: `access:${token.slice(8)}`,
+          expires_in: 3600,
+          token_type: 'Bearer',
+        });
+      }
       const grant = await state.get(`google:code:${p.get('code')}`);
       await state.set(`google:code:${p.get('code')}`, null);
       if (

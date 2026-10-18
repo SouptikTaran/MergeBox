@@ -3,6 +3,118 @@ const assert = require('node:assert/strict');
 const { createHarness } = require('./helpers/integration.cjs');
 const h = createHarness();
 
+async function accountId() {
+  return (await h.pg.query('SELECT id FROM drive_accounts')).rows[0].id;
+}
+
+test('disconnect revokes the grant and removes local account data idempotently', async () => {
+  const user = await login();
+  await connect(user, 'drive-one');
+  const id = await accountId();
+  assert.equal(
+    await h.access.accessToken(user.user.id, id),
+    'access:drive-one',
+  );
+  const pending = await beginConnection(user, 'drive-one');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    assert.equal(
+      (
+        await h.request(`/api/drive/accounts/${id}`, {
+          method: 'DELETE',
+          headers: user.headers,
+        })
+      ).status,
+      204,
+    );
+  }
+  assert.equal(
+    (await h.pg.query('SELECT count(*)::int AS count FROM drive_accounts'))
+      .rows[0].count,
+    0,
+  );
+  const staleCallback = await h.request(pending.callback, {
+    headers: { Cookie: `${user.session}; ${pending.binding}` },
+  });
+  assert.match(staleCallback.headers.get('location'), /drive=invalid_state$/);
+  await assert.rejects(h.access.accessToken(user.user.id, id), {
+    code: 'account_not_found',
+  });
+});
+test('another user cannot disconnect or refresh someone else’s account', async () => {
+  const owner = await login();
+  await connect(owner, 'drive-one');
+  const id = await accountId();
+  const other = await login('other-user');
+  await h.request(`/api/drive/accounts/${id}`, {
+    method: 'DELETE',
+    headers: other.headers,
+  });
+  assert.equal(
+    (await h.pg.query('SELECT count(*)::int AS count FROM drive_accounts'))
+      .rows[0].count,
+    1,
+  );
+  await assert.rejects(h.access.accessToken(other.user.id, id), {
+    code: 'account_not_found',
+  });
+});
+test('invalid refresh grant requires reconnect; transient failures do not', async () => {
+  const user = await login();
+  await connect(user, 'revoked');
+  const id = await accountId();
+  await assert.rejects(h.access.accessToken(user.user.id, id), {
+    code: 'reconnect_required',
+  });
+  assert.equal(
+    (await h.pg.query('SELECT status FROM drive_accounts')).rows[0].status,
+    'reconnect',
+  );
+  assert.match(
+    (await connect(user, 'revoked', 'no_refresh', id)).headers.get('location'),
+    /drive=reconnect_required$/,
+  );
+  await h.pg.exec('TRUNCATE drive_accounts');
+  await connect(user, 'refresh-outage');
+  await assert.rejects(h.access.accessToken(user.user.id, await accountId()), {
+    code: 'provider_unavailable',
+  });
+  assert.equal(
+    (await h.pg.query('SELECT status FROM drive_accounts')).rows[0].status,
+    'active',
+  );
+});
+test('revocation failures disable access immediately and bound credential retention', async () => {
+  const user = await login();
+  await connect(user, 'revoke-failure');
+  const id = await accountId();
+  assert.equal(
+    (
+      await h.request(`/api/drive/accounts/${id}`, {
+        method: 'DELETE',
+        headers: user.headers,
+      })
+    ).status,
+    202,
+  );
+  await assert.rejects(h.access.accessToken(user.user.id, id), {
+    code: 'account_not_found',
+  });
+  await h.access.retryDisconnects();
+  assert.equal(
+    (await h.pg.query('SELECT status FROM drive_accounts')).rows[0].status,
+    'disconnecting',
+  );
+  await h.pg.exec(
+    "UPDATE drive_accounts SET updated_at = now() - interval '25 hours'",
+  );
+  await h.access.retryDisconnects();
+  assert.equal(
+    (await h.pg.query('SELECT count(*)::int AS count FROM drive_accounts'))
+      .rows[0].count,
+    0,
+  );
+});
+
 async function login(subject = 'application-user') {
   const { session } = await h.signIn('success', { subject });
   const profile = await (

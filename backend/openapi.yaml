@@ -5,6 +5,21 @@ info:
 servers:
   - url: http://localhost:8000
 paths:
+  /api/drive/accounts/{id}:
+    delete:
+      operationId: disconnectDriveAccount
+      security: [{ session: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Origin, in: header, required: true, schema: { type: string } }
+        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+      responses:
+        '204': { description: Account removed or already absent. Google files are never deleted. }
+        '202': { description: Access disabled immediately; encrypted credentials retained for revocation retries for at most 24 hours. User may manually revoke in Google Account settings. }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/drive/accounts:
     get:
       operationId: listDriveAccounts

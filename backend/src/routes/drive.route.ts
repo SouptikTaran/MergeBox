@@ -10,11 +10,13 @@ import {
 import { createSessionMiddleware } from '../middleware/session.middleware';
 import type { GoogleProvider } from '../services/google.service';
 import type { TokenEncryption } from '../services/token-encryption.service';
+import type { DriveAccess } from '../services/drive-access.service';
 
 export interface DriveDependencies {
   repository: DriveRepository;
   google: GoogleProvider;
   encryption: TokenEncryption;
+  access: DriveAccess;
 }
 export function createDriveRouter(
   auth: AuthStore,
@@ -28,6 +30,7 @@ export function createDriveRouter(
     dependencies.google,
     dependencies.encryption,
     config,
+    dependencies.access,
   );
   const rateLimit = createLoginRateLimit();
   router.use(authResponseHeaders, requireSession);
@@ -40,5 +43,6 @@ export function createDriveRouter(
     controller.connect,
   );
   router.get('/oauth/callback', rateLimit, controller.callback);
+  router.delete('/accounts/:id', requireCsrf, controller.disconnect);
   return router;
 }
