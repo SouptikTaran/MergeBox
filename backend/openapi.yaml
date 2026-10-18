@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: DrivePool backend
+  version: 0.1.0-draft
+servers:
+  - url: http://localhost:8000
+paths:
+  /api/auth/google:
+    get:
+      operationId: googleSignIn
+      description: Start Google sign-in with PKCE, state and a browser-binding cookie. No Drive scopes are requested.
+      responses:
+        '302':
+          description: Redirect to Google. Sets a 10-minute HttpOnly, SameSite=Lax OAuth cookie.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/auth/google/callback:
+    get:
+      operationId: googleCallback
+      description: Consumes the state once, verifies the ID token and rotates the session. Requires the original OAuth cookie. Redirect target is fixed to APP_ORIGIN, never caller-controlled.
+      parameters:
+        - { name: state, in: query, required: true, schema: { type: string } }
+        - { name: code, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '303':
+          description: Redirect to APP_ORIGIN/?auth=success or a safe failure code (invalid_state, invalid_code, invalid_identity, consent_denied, provider_unavailable). Success sets the session cookie; the OAuth cookie is cleared.
+          headers:
+            Location:
+              schema: { type: string, format: uri }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/auth/me:
+    get:
+      operationId: currentUser
+      security: [{ session: [] }]
+      responses:
+        '200':
+          description: Safe profile and session-bound CSRF token. Cache-Control is no-store.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, csrfToken]
+                properties:
+                  user:
+                    type: object
+                    required: [id, email, name, avatarUrl, plan]
+                    properties:
+                      id: { type: string, format: uuid }
+                      email: { type: string }
+                      name: { type: [string, 'null'] }
+                      avatarUrl: { type: [string, 'null'] }
+                      plan: { type: string }
+                  csrfToken: { type: string }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/auth/logout:
+    post:
+      operationId: logout
+      security: [{ session: [] }]
+      parameters:
+        - { name: Origin, in: header, required: true, schema: { type: string }, description: Must equal APP_ORIGIN. }
+        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string }, description: CSRF token returned by /api/auth/me. }
+      responses:
+        '204': { description: Session deleted and cookie cleared. }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: drivepool_session
+      description: Development name. Production uses __Host-drivepool_session with Secure, HttpOnly, SameSite=Lax, Path=/; absolute lifetime seven days.
+  responses:
+    Error:
+      description: Safe application error. Provider payloads and credentials are never returned.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [error]
+            properties:
+              error:
+                type: object
+                required: [code, message]
+                properties:
+                  code: { type: string }
+                  message: { type: string }

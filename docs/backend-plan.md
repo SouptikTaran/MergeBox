@@ -33,7 +33,7 @@ their login account or another Google account explicitly.
 | Order | Feature and PRD IDs | Completion evidence | State |
 | --- | --- | --- | --- |
 | 0 | Database foundation and remove notes example | Shared Drizzle client, single URL, read-only check, successful build | Implemented locally |
-| 1 | Google sign-in and sessions, 0.1-1 | New and returning users, logout, expired session, rejected callback replay and invalid identity | Planned |
+| 1 | Google sign-in and sessions, 0.1-1 | New and returning users, logout, expired session, rejected callback replay and invalid identity | Implemented; 20 local integration tests pass; real Google acceptance pending |
 | 2 | Connect multiple Drive accounts, 0.1-2, 0.1-3, 0.1-7 | Two distinct accounts attached to one user, encrypted refresh tokens, ownership checks, denied consent | Planned |
 | 3 | Disconnect and reconnect, 0.1-3, 0.1-8 | Revocation, local metadata cleanup, missing/expired refresh token, repeat disconnect | Planned |
 | 4 | Per-account and combined storage, 0.1-4 | Byte-accurate quota parsing, unknown limits, shared quota exclusions, partial failures | Planned |

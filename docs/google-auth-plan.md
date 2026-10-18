@@ -5,8 +5,9 @@ Draft v0.1 · October 18, 2026
 The backend owns OAuth code exchange, identity verification, sessions, and Drive
 credentials. The browser receives an opaque session cookie and safe user/account
 data. App login and adding a Drive account are separate operations. This plan is
-the specification for the next backend feature; authentication is not implemented
-yet.
+the specification for the backend feature. Sign-in and local sessions are implemented
+with integration tests; real Google consent acceptance is pending. Drive linking
+remains a separate feature.
 
 ## Identity and permissions
 

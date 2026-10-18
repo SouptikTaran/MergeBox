@@ -17,6 +17,26 @@ yarn dev
 Runs at http://localhost:8000. `GET /hello` logs the request and returns
 `{"message":"Hello World!"}`.
 
+### Google sign-in
+
+Use Node 22.12 or later. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
+`APP_ORIGIN`, and `API_ORIGIN` in `backend/.env` using `.env.example`. Register
+`http://localhost:8000/api/auth/google/callback` as an authorized redirect URI on
+a Google OAuth **Web application** client. Keep frontend and backend on the same
+site in production; origins must use HTTPS there.
+
+Run `yarn db:migrate` from `backend/`, then `yarn dev`. Open
+`http://localhost:8000/api/auth/google` to sign in. The callback returns to the
+frontend root with an `auth` outcome. Browser API calls must use
+`credentials: 'include'`. `GET /api/auth/me` returns the profile and CSRF token;
+send that token as `X-CSRF-Token` on `POST /api/auth/logout` from `APP_ORIGIN`.
+
+See [the API contract](backend/openapi.yaml) and [integration test instructions](backend/test/README.md).
+Sessions expire after seven days. Expired sessions and OAuth transactions are
+cleaned every 15 minutes while the backend runs. Rate limiting currently uses
+process memory and assumes the API is directly reachable; configure a trusted
+proxy and shared rate-limit store before a multi-instance production deployment.
+
 ## Database (Neon + Drizzle)
 
 The backend uses Drizzle ORM with a shared PostgreSQL connection pool.

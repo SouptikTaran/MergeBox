@@ -1,0 +1,4 @@
+version: 1
+name: Google OAuth local simulator
+interceptRequests: true
+mockSrc: default.js
