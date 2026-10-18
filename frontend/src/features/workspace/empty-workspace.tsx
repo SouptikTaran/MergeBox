@@ -1,37 +1,18 @@
 "use client";
-
-import { HardDrive } from "lucide-react";
 import { Frame, FramePanel } from "@/components/reui/frame";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-  EmptyMedia,
-} from "@/components/ui/empty";
-import { Button } from "@/components/ui/button";
-import { useWorkspace } from "./workspace-provider";
-
+import { ConnectDriveButton } from "@/features/drives/connect-drive-button";
 export function EmptyWorkspace() {
-  const { setPreview } = useWorkspace();
   return (
-    <Frame spacing="default">
+    <Frame>
       <FramePanel>
-        <Empty>
-          <EmptyHeader>
-            <EmptyMedia variant="icon">
-              <HardDrive />
-            </EmptyMedia>
-            <EmptyTitle>A fresh start for your files</EmptyTitle>
-            <EmptyDescription>
-              Drive linking is coming soon. Explore a sample workspace while we get things
-              ready.
-            </EmptyDescription>
-          </EmptyHeader>
-          <Button size="sm" onClick={() => setPreview(true)}>
-            Explore preview
-          </Button>
-        </Empty>
+        <div className="flex flex-col items-start gap-4 py-8">
+          <h2 className="font-semibold">A fresh start for your files</h2>
+          <p className="text-sm text-muted-foreground">
+            Connect a Google Drive account to see its storage and files. Sign-in alone
+            does not grant Drive access.
+          </p>
+          <ConnectDriveButton />
+        </div>
       </FramePanel>
     </Frame>
   );

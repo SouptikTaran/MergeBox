@@ -11,12 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/features/auth/session-provider";
 import { SignInButton } from "@/features/auth/sign-in-button";
-import { useWorkspace } from "@/features/workspace/workspace-provider";
 
 export function SettingsPage() {
   const { state, refresh, logout } = useSession();
   const { theme, setTheme } = useTheme();
-  const { preview, setPreview } = useWorkspace();
   const [busy, setBusy] = useState(false);
   async function signOut() {
     setBusy(true);
@@ -116,22 +114,6 @@ export function SettingsPage() {
                   </Button>
                 ))}
               </div>
-            </div>
-          </FramePanel>
-        </Frame>
-        <Frame spacing="default">
-          <FrameHeader>
-            <FrameTitle>Workspace preview</FrameTitle>
-          </FrameHeader>
-          <FramePanel>
-            <div className="flex flex-col items-start gap-4">
-              <p className="text-sm text-muted-foreground">
-                Explore the layout with sample drives and files. Preview content is
-                separate from your Google account.
-              </p>
-              <Button size="sm" variant="outline" onClick={() => setPreview(!preview)}>
-                {preview ? "Exit preview" : "Explore preview"}
-              </Button>
             </div>
           </FramePanel>
         </Frame>

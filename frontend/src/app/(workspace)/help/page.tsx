@@ -20,10 +20,10 @@ export default function Page() {
           <FramePanel>
             <div className="flex flex-col items-start gap-4">
               <p className="text-sm text-muted-foreground">
-                Explore the overview, search sample files, and open their details. Use
-                Settings to switch themes or leave preview mode.
+                See storage across your connected accounts and browse their files. Use
+                Settings to switch themes or sign out.
               </p>
-              <Badge variant="outline">Available in preview</Badge>
+              <Badge variant="outline">Connected workspace</Badge>
             </div>
           </FramePanel>
         </Frame>
@@ -48,11 +48,11 @@ export default function Page() {
           <FramePanel>
             <div className="flex flex-col items-start gap-4">
               <p className="text-sm text-muted-foreground">
-                A future release will let you connect Google Drive accounts with separate
+                Use Connect drive to grant Google Drive metadata access with separate
                 consent, see combined storage, and open files in their original Drive.
                 Uploads and transfers will follow later.
               </p>
-              <Badge variant="primary-light">Coming soon</Badge>
+              <Badge variant="primary-light">Read-only Drive access</Badge>
             </div>
           </FramePanel>
         </Frame>

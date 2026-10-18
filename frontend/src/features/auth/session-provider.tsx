@@ -46,6 +46,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [loadSession]);
 
   useEffect(() => {
+    const expire = () => {
+      requestId.current++;
+      setState({ status: "anonymous", session: null });
+    };
+    window.addEventListener("session-expired", expire);
+    const focus = () => {
+      void loadSession();
+    };
+    window.addEventListener("focus", focus);
+    return () => {
+      window.removeEventListener("session-expired", expire);
+      window.removeEventListener("focus", focus);
+    };
+  }, [loadSession]);
+
+  useEffect(() => {
     // loadSession only commits state after the asynchronous network request settles.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadSession();

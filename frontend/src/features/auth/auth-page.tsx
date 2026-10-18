@@ -21,6 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { API_ORIGIN } from "@/lib/api/client";
 import { useSession } from "./session-provider";
+import { AuthOutcome } from "./auth-outcome";
 
 export function AuthPage({ mode }: { mode: "login" | "signup" }) {
   const { state, refresh } = useSession();
@@ -28,6 +29,7 @@ export function AuthPage({ mode }: { mode: "login" | "signup" }) {
 
   return (
     <div className="flex w-full max-w-sm flex-col gap-6">
+      <AuthOutcome />
       <div className="flex justify-center">
         <Badge variant="outline">Your personal cloud workspace</Badge>
       </div>

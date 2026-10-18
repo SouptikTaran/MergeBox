@@ -19,6 +19,8 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     cache: "no-store",
   });
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined")
+      window.dispatchEvent(new Event("session-expired"));
     const body = await response.json().catch(() => null);
     throw new ApiError(
       response.status,

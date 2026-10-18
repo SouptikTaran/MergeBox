@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "./session-provider";
 
 const messages: Record<string, string> = {
+  connected: "Google Drive connected. Your files and storage are now available.",
+  missing_scope:
+    "Drive access was not granted. Connect again and allow Drive metadata access.",
+  reconnect_required:
+    "Google needs a fresh Drive authorization. Please reconnect the account.",
+  wrong_account: "Choose the same Google account when reconnecting this drive.",
+  account_conflict:
+    "That Drive is already linked to another DrivePool user or is being disconnected.",
   success: "Google sign-in completed. Drive access requires a separate connection.",
   consent_denied: "Sign-in was cancelled. You can try again whenever you’re ready.",
   invalid_state: "This sign-in link expired. Please start again.",
@@ -19,17 +27,20 @@ export function AuthOutcome() {
   const { state } = useSession();
   useEffect(() => {
     const url = new URL(window.location.href);
-    const result = url.searchParams.get("auth");
+    const result = url.searchParams.get("drive") ?? url.searchParams.get("auth");
     if (result) {
       // Capture a one-time external OAuth redirect before removing it from the URL.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setOutcome(result);
       url.searchParams.delete("auth");
+      url.searchParams.delete("drive");
       window.history.replaceState(window.history.state, "", url);
     }
   }, []);
   if (!outcome) return null;
-  const success = outcome === "success" && state.status === "authenticated";
+  const success =
+    (outcome === "success" || outcome === "connected") &&
+    state.status === "authenticated";
   const message =
     outcome === "success" && !success
       ? "Verifying your session. Check Settings if your account does not appear."

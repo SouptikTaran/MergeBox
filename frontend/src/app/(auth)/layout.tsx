@@ -14,7 +14,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           className="flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Explore preview
+          Open workspace
         </Link>
       </header>
       <main className="flex flex-1 items-center justify-center p-6">{children}</main>

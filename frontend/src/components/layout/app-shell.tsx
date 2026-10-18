@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useSession } from "@/features/auth/session-provider";
 import { useWorkspace } from "@/features/workspace/workspace-provider";
-import { previewAccounts } from "@/features/workspace/preview-data";
+import { formatBytes } from "@/features/workspace/api-types";
 
 const navigation = [
   { href: "/", title: "Overview", icon: LayoutDashboard },
@@ -48,7 +48,8 @@ const navigation = [
 function AppSidebar() {
   const pathname = usePathname();
   const { state } = useSession();
-  const { preview } = useWorkspace();
+  const { accounts, storage } = useWorkspace();
+  const combined = storage?.combined;
   const { isMobile, setOpenMobile } = useSidebar();
   const closeMobile = () => {
     if (isMobile) setOpenMobile(false);
@@ -89,13 +90,11 @@ function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>
-            YOUR DRIVES {preview && <span className="text-xs">/ PREVIEW</span>}
-          </SidebarGroupLabel>
+          <SidebarGroupLabel>YOUR DRIVES</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {preview ? (
-                previewAccounts.map((account) => (
+              {accounts.length ? (
+                accounts.map((account) => (
                   <SidebarMenuItem key={account.id}>
                     <SidebarMenuButton
                       render={
@@ -103,9 +102,9 @@ function AppSidebar() {
                       }
                     >
                       <HardDrive />
-                      <span>{account.label}</span>
+                      <span>{account.email}</span>
                       <span className="ml-auto text-xs tabular-nums text-muted-foreground">
-                        {account.usedGB} GB
+                        {account.status === "reconnect" ? "Reconnect" : ""}
                       </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -146,17 +145,21 @@ function AppSidebar() {
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">Pooled storage</span>
             <span className="text-muted-foreground">
-              {preview ? "35% used" : "Not connected"}
+              {combined ? `${formatBytes(combined.free)} free` : "Not available"}
             </span>
           </div>
           <Progress
-            value={preview ? 35.07 : 0}
-            aria-label="Pooled preview storage usage"
+            value={
+              combined && Number(combined.total) > 0
+                ? Math.min(100, (Number(combined.used) / Number(combined.total)) * 100)
+                : 0
+            }
+            aria-label="Combined personal storage usage"
           />
           <p className="text-xs text-muted-foreground tabular-nums">
-            {preview
-              ? "75.4 GB of 215 GB · Sample data"
-              : "Connect drives in a future release"}
+            {combined
+              ? `${formatBytes(combined.used)} of ${formatBytes(combined.total)}`
+              : "Connect a drive to see your storage"}
           </p>
         </div>
         <SidebarSeparator />
@@ -197,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       { href: "/help", title: "Help" },
     ].find((item) => item.href === pathname)?.title ?? "Workspace";
   const { setTheme, resolvedTheme } = useTheme();
-  const { preview, setPreview } = useWorkspace();
+  const { loading, error, refresh } = useWorkspace();
   return (
     <SidebarProvider>
       <a
@@ -247,28 +250,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-4 text-xs text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Badge variant="outline">
-                {preview ? "Preview workspace" : "Your workspace"}
-              </Badge>
+              <Badge variant="outline">Your workspace</Badge>
               <span>
-                {preview
-                  ? "Explore with sample files and drives."
-                  : "Drive features are coming soon."}
+                {loading
+                  ? "Loading your Google Drive data..."
+                  : "Your connected Google Drive accounts"}
               </span>
             </div>
-            <Button size="sm" variant="ghost" onClick={() => setPreview(!preview)}>
-              {preview ? "Exit preview" : "Explore preview"}
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={loading}
+              onClick={() => void refresh()}
+            >
+              Refresh
               <ChevronRight />
             </Button>
           </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error} Use Refresh to try again.
+            </p>
+          )}
           {children}
           <footer className="mt-auto flex flex-wrap justify-between gap-2 pt-4 text-xs text-muted-foreground">
             <span>DrivePool — a little more room for everything.</span>
-            <span>
-              {preview
-                ? "Sample data · No Drive access"
-                : "Your files stay in Google Drive"}
-            </span>
+            <span>Your files stay in Google Drive</span>
           </footer>
         </main>
       </SidebarInset>
