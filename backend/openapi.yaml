@@ -5,6 +5,80 @@ info:
 servers:
   - url: http://localhost:8000
 paths:
+  /api/drive/accounts:
+    get:
+      operationId: listDriveAccounts
+      security: [{ session: [] }]
+      responses:
+        '200':
+          description: Connected accounts owned by the session user. Credentials are never returned.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts]
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, email, status, createdAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        email: { type: string }
+                        status: { enum: [active, reconnect, disconnecting] }
+                        createdAt: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/drive/accounts/connect:
+    post:
+      operationId: connectDriveAccount
+      security: [{ session: [] }]
+      parameters:
+        - { name: Origin, in: header, required: true, schema: { type: string } }
+        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Sets the HttpOnly browser-binding cookie. Navigate the browser to authorizationUrl.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authorizationUrl]
+                properties:
+                  authorizationUrl: { type: string, format: uri }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/drive/accounts/{id}/reconnect:
+    post:
+      operationId: reconnectDriveAccount
+      security: [{ session: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: Origin, in: header, required: true, schema: { type: string } }
+        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Authorization URL and browser-binding cookie, as for connect. Callback must match the existing Google subject. }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+  /api/drive/oauth/callback:
+    get:
+      operationId: driveOAuthCallback
+      security: [{ session: [] }]
+      parameters:
+        - { name: state, in: query, required: true, schema: { type: string } }
+        - { name: code, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '303': { description: Redirect to APP_ORIGIN/?drive=connected or a safe outcome (invalid_state, invalid_code, invalid_identity, consent_denied, provider_unavailable, missing_scope, reconnect_required, wrong_account, account_conflict). Requires the initiating session and browser-binding cookie. }
+        '401': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/auth/google:
     get:
       operationId: googleSignIn

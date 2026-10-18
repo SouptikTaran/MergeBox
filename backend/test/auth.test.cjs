@@ -1,109 +1,10 @@
-const { test, before, after, beforeEach, afterEach } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { once } = require('node:events');
-const { fork } = require('node:child_process');
-const path = require('node:path');
-const { PGlite } = require('@electric-sql/pglite');
-const { drizzle } = require('drizzle-orm/pglite');
-const { migrate } = require('drizzle-orm/pglite/migrator');
-const { createApp } = require('../dist/app');
-const { createAuthStore } = require('../dist/db/auth.repository');
-const { createGoogleProvider } = require('../dist/services/google.service');
 const { hash, randomToken } = require('../dist/utils/auth.util');
-const schema = require('../dist/db/schema');
-let pg, db, store, server, base, simulator, upstream;
-const config = {
-  clientId: 'test-client',
-  clientSecret: 'test-secret',
-  appOrigin: 'http://localhost:3000',
-  apiOrigin: 'http://localhost:8000',
-  production: false,
-};
+const { createHarness } = require('./helpers/integration.cjs');
+const h = createHarness();
+const { config, request, cookie, begin, signIn, close, startApp } = h;
 
-before(async () => {
-  if (process.env.OAUTH_SIM_URL) upstream = process.env.OAUTH_SIM_URL;
-  else {
-    simulator = fork(path.resolve('../postman/mocks/google/default.js'), [], {
-      env: { ...process.env, PORT: '0' },
-      stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
-    });
-    const [message] = await once(simulator, 'message');
-    upstream = `http://127.0.0.1:${message.port}`;
-  }
-  pg = new PGlite();
-  db = drizzle(pg, { schema });
-  await migrate(db, { migrationsFolder: path.resolve('drizzle') });
-  store = createAuthStore(db);
-});
-async function startApp(overrides = {}) {
-  const current = { ...config, ...overrides };
-  const provider = createGoogleProvider(
-    current,
-    {
-      authorize: `${upstream}/authorize`,
-      token: `${upstream}/token`,
-      jwks: `${upstream}/jwks`,
-    },
-    600,
-  );
-  server = createApp(store, provider, current).listen(0, '127.0.0.1');
-  await once(server, 'listening');
-  base = `http://127.0.0.1:${server.address().port}`;
-}
-const close = () =>
-  new Promise((resolve) => {
-    server.close(resolve);
-    server.closeAllConnections();
-  });
-beforeEach(async () => {
-  await pg.exec(
-    'TRUNCATE users, auth_identities, sessions, oauth_transactions CASCADE',
-  );
-  await startApp();
-});
-afterEach(close);
-after(async () => {
-  if (simulator) {
-    simulator.kill();
-    await once(simulator, 'exit');
-  }
-  await pg.close();
-});
-const request = (route, options = {}) =>
-  fetch(`${base}${route}`, { redirect: 'manual', ...options });
-function cookie(response, name) {
-  return response.headers
-    .getSetCookie()
-    .find((value) => value.startsWith(`${name}=`))
-    ?.split(';')[0];
-}
-async function begin(scenario = 'success', extra = {}) {
-  const response = await request('/api/auth/google');
-  assert.equal(response.status, 302);
-  const authorization = new URL(response.headers.get('location'));
-  assert.equal(authorization.searchParams.get('scope'), 'openid email profile');
-  assert.equal(authorization.searchParams.get('access_type'), 'online');
-  authorization.searchParams.set('scenario', scenario);
-  for (const [key, value] of Object.entries(extra))
-    authorization.searchParams.set(key, value);
-  const authorized = await fetch(authorization, { redirect: 'manual' });
-  assert.equal(authorized.status, 302);
-  const callback = new URL(authorized.headers.get('location'));
-  return {
-    callback: callback.pathname + callback.search,
-    cookie: cookie(response, 'drivepool_oauth'),
-    state: callback.searchParams.get('state'),
-  };
-}
-async function signIn(scenario = 'success', extra = {}, previousCookie = '') {
-  const flow = await begin(scenario, extra);
-  const response = await request(flow.callback, {
-    headers: {
-      Cookie: [flow.cookie, previousCookie].filter(Boolean).join('; '),
-    },
-  });
-  return { ...flow, response, session: cookie(response, 'drivepool_session') };
-}
 test('login, hashed session, profile, CSRF protection and logout', async () => {
   const login = await signIn();
   assert.equal(
@@ -111,7 +12,7 @@ test('login, hashed session, profile, CSRF protection and logout', async () => {
     `${config.appOrigin}/?auth=success`,
   );
   assert.ok(login.session);
-  const saved = await pg.query('SELECT token_hash FROM sessions');
+  const saved = await h.pg.query('SELECT token_hash FROM sessions');
   assert.equal(saved.rows[0].token_hash, hash(login.session.split('=')[1]));
   const me = await request('/api/auth/me', {
     headers: { Cookie: login.session },
@@ -169,14 +70,14 @@ test('callback replay, missing and incorrect browser bindings are rejected', asy
   });
   assert.match(replay.headers.get('location'), /auth=invalid_state$/);
   assert.equal(
-    (await pg.query('SELECT count(*)::int AS count FROM sessions')).rows[0]
+    (await h.pg.query('SELECT count(*)::int AS count FROM sessions')).rows[0]
       .count,
     1,
   );
 });
 test('expired OAuth state cannot establish a session', async () => {
   const flow = await begin();
-  await pg.exec(
+  await h.pg.exec(
     "UPDATE oauth_transactions SET expires_at = now() - interval '1 minute'",
   );
   const response = await request(flow.callback, {
@@ -202,7 +103,7 @@ for (const scenario of [
     );
     assert.equal(login.session, undefined);
     assert.equal(
-      (await pg.query('SELECT count(*)::int AS count FROM users')).rows[0]
+      (await h.pg.query('SELECT count(*)::int AS count FROM users')).rows[0]
         .count,
       0,
     );
@@ -229,7 +130,8 @@ test('returning identity updates email and rotates the session without duplicate
   );
   assert.notEqual(first.session, second.session);
   assert.equal(
-    (await pg.query('SELECT count(*)::int AS count FROM users')).rows[0].count,
+    (await h.pg.query('SELECT count(*)::int AS count FROM users')).rows[0]
+      .count,
     1,
   );
   assert.equal(
@@ -246,7 +148,8 @@ test('different subjects with the same email are not auto-linked', async () => {
   await signIn();
   await signIn('success', { subject: 'second-google-user' });
   assert.equal(
-    (await pg.query('SELECT count(*)::int AS count FROM users')).rows[0].count,
+    (await h.pg.query('SELECT count(*)::int AS count FROM users')).rows[0]
+      .count,
     2,
   );
 });
@@ -259,15 +162,17 @@ test('session survives app recreation, expires, and cleanup removes expired rows
       .status,
     200,
   );
-  await pg.exec("UPDATE sessions SET expires_at = now() - interval '1 minute'");
+  await h.pg.exec(
+    "UPDATE sessions SET expires_at = now() - interval '1 minute'",
+  );
   assert.equal(
     (await request('/api/auth/me', { headers: { Cookie: login.session } }))
       .status,
     401,
   );
-  await store.cleanup();
+  await h.store.cleanup();
   assert.equal(
-    (await pg.query('SELECT count(*)::int AS count FROM sessions')).rows[0]
+    (await h.pg.query('SELECT count(*)::int AS count FROM sessions')).rows[0]
       .count,
     0,
   );

@@ -1,4 +1,5 @@
 import type { ErrorRequestHandler } from 'express';
+import { HttpError } from '../utils/http-error.util';
 
 export const handleError: ErrorRequestHandler = (
   error: unknown,
@@ -6,6 +7,13 @@ export const handleError: ErrorRequestHandler = (
   res,
   _next,
 ) => {
+  if (error instanceof HttpError) {
+    res
+      .set('Cache-Control', 'no-store')
+      .status(error.status)
+      .json({ error: { code: error.code, message: error.message } });
+    return;
+  }
   // OAuth and SQL errors can contain credentials, so do not log the raw error.
   const type = (error as { type?: string } | null)?.type;
   const invalidBody =

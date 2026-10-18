@@ -3,10 +3,16 @@ import { readAuthConfig } from './config/auth.config';
 import { createGoogleProvider } from './services/google.service';
 import { createAuthStore } from './db/auth.repository';
 import { closeDatabase, db } from './db';
+import { createDriveRepository } from './db/drive.repository';
+import { configuredTokenEncryption } from './services/token-encryption.service';
 
 const config = readAuthConfig();
 const store = createAuthStore(db);
-const app = createApp(store, createGoogleProvider(config), config);
+const app = createApp(store, createGoogleProvider(config), config, {
+  repository: createDriveRepository(db),
+  google: createGoogleProvider(config, undefined, undefined, 'drive'),
+  encryption: configuredTokenEncryption(),
+});
 const port = Number(process.env.PORT || 8000);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error('PORT must be between 1 and 65535.');

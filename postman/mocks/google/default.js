@@ -118,6 +118,13 @@ const server = http.createServer(async (req, res) => {
         access_token: 'test-access-token',
         token_type: 'Bearer',
         expires_in: 3600,
+        ...(grant.access_type === 'offline' && grant.scenario !== 'no_refresh'
+          ? { refresh_token: `refresh-${grant.subject || 'google-user-1'}` }
+          : {}),
+        scope:
+          grant.scenario === 'missing_scope'
+            ? 'openid email profile'
+            : grant.scope,
       });
     }
     return send(res, 501, { error: 'Endpoint not modeled' });

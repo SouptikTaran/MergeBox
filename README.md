@@ -25,6 +25,15 @@ Use Node 22.12 or later. Configure `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
 a Google OAuth **Web application** client. Keep frontend and backend on the same
 site in production; origins must use HTTPS there.
 
+For Drive linking, enable the Google Drive API and register the additional callback
+`http://localhost:8000/api/drive/oauth/callback`. Add the restricted
+`drive.metadata.readonly` permission to the consent configuration and add test users.
+Configure `TOKEN_ENCRYPTION_KEY` with a base64-encoded 32-byte random key. Preserve
+it across deployments; it is needed to decrypt existing connected-account tokens.
+No Google KMS is used. Call `POST /api/drive/accounts/connect` with the session,
+Origin, and CSRF header, then navigate to the returned `authorizationUrl`.
+`GET /api/drive/accounts` returns safe account summaries.
+
 Run `yarn db:migrate` from `backend/`, then `yarn dev`. Open
 `http://localhost:8000/api/auth/google` to sign in. The callback returns to the
 frontend root with an `auth` outcome. Browser API calls must use

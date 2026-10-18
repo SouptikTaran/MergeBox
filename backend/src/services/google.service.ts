@@ -23,11 +23,12 @@ export function createGoogleProvider(
   config: AuthConfig,
   endpoints = GOOGLE,
   timeoutMs = 10_000,
+  purpose: 'login' | 'drive' = 'login',
 ) {
   const keys = createRemoteJWKSet(new URL(endpoints.jwks), {
     timeoutDuration: timeoutMs,
   });
-  const redirectUri = `${config.apiOrigin}/api/auth/google/callback`;
+  const redirectUri = `${config.apiOrigin}${purpose === 'login' ? '/api/auth/google/callback' : '/api/drive/oauth/callback'}`;
   return {
     authorizationUrl(state: string, nonce: string, verifier: string) {
       const url = new URL(endpoints.authorize);
@@ -35,13 +36,17 @@ export function createGoogleProvider(
         client_id: config.clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
-        scope: 'openid email profile',
+        scope:
+          purpose === 'login'
+            ? 'openid email profile'
+            : 'openid email profile https://www.googleapis.com/auth/drive.metadata.readonly',
         state,
         nonce,
         code_challenge: challenge(verifier),
         code_challenge_method: 'S256',
-        prompt: 'select_account',
-        access_type: 'online',
+        prompt:
+          purpose === 'login' ? 'select_account' : 'consent select_account',
+        access_type: purpose === 'login' ? 'online' : 'offline',
       }).toString();
       return url.toString();
     },
@@ -50,6 +55,17 @@ export function createGoogleProvider(
       verifier: string,
       nonce: string,
     ): Promise<GoogleIdentity> {
+      return (await this.exchangeGrant(code, verifier, nonce)).identity;
+    },
+    async exchangeGrant(
+      code: string,
+      verifier: string,
+      nonce: string,
+    ): Promise<{
+      identity: GoogleIdentity;
+      refreshToken: string | null;
+      scopes: string;
+    }> {
       let response: Response;
       try {
         response = await fetch(endpoints.token, {
@@ -73,8 +89,14 @@ export function createGoogleProvider(
         throw new OAuthFailure('provider_unavailable');
       if (!response.ok) throw new OAuthFailure('invalid_code');
       let token: unknown;
+      let grant: {
+        id_token?: unknown;
+        refresh_token?: unknown;
+        scope?: unknown;
+      };
       try {
-        token = ((await response.json()) as { id_token?: unknown }).id_token;
+        grant = (await response.json()) as typeof grant;
+        token = grant.id_token;
       } catch {
         throw new OAuthFailure('invalid_identity');
       }
@@ -100,6 +122,7 @@ export function createGoogleProvider(
           payload.email_verified !== true ||
           typeof payload.email !== 'string' ||
           !payload.email ||
+          typeof payload.sub !== 'string' ||
           !payload.sub ||
           payload.sub.length > 255 ||
           (payload.azp !== undefined && payload.azp !== config.clientId) ||
@@ -109,7 +132,7 @@ export function createGoogleProvider(
         ) {
           throw new OAuthFailure('invalid_identity');
         }
-        return {
+        const identity: GoogleIdentity = {
           subject: payload.sub,
           email: payload.email,
           name: typeof payload.name === 'string' ? payload.name : null,
@@ -118,6 +141,14 @@ export function createGoogleProvider(
             payload.picture.startsWith('https://')
               ? payload.picture
               : null,
+        };
+        return {
+          identity,
+          refreshToken:
+            typeof grant.refresh_token === 'string' && grant.refresh_token
+              ? grant.refresh_token
+              : null,
+          scopes: typeof grant.scope === 'string' ? grant.scope : '',
         };
       } catch (error) {
         if (error instanceof OAuthFailure) throw error;

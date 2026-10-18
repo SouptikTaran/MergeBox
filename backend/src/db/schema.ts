@@ -63,7 +63,37 @@ export const oauthTransactions = pgTable(
     nonce: text('nonce').notNull(),
     verifier: text('verifier').notNull(),
     intent: text('intent').default('login').notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+    sessionHash: text('session_hash').references(() => sessions.tokenHash, {
+      onDelete: 'cascade',
+    }),
+    expectedSubject: text('expected_subject'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },
   (table) => [index('oauth_transactions_expiry_idx').on(table.expiresAt)],
+);
+
+export const driveAccounts = pgTable(
+  'drive_accounts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    googleSubject: text('google_subject').notNull().unique(),
+    email: text('email').notNull(),
+    encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
+    scopes: text('scopes').notNull(),
+    status: text('status')
+      .$type<'active' | 'reconnect' | 'disconnecting'>()
+      .default('active')
+      .notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index('drive_accounts_user_idx').on(table.userId)],
 );
