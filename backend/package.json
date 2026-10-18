@@ -7,17 +7,26 @@
     "dev": "nodemon src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:check": "ts-node src/db/check.ts"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "^0.31.11",
     "nodemon": "^3.1.14",
     "prettier": "^3.9.10",
     "ts-node": "^10.9.2",
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "express": "^5.3.0"
+    "dotenv": "^18.0.8",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
+    "pg": "^8.23.1"
   }
 }

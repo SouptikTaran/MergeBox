@@ -1,4 +1,5 @@
 
+import './config/env';
 import express from 'express';
 import type { Request, Response } from 'express';
 import router from './routes/index.route';
