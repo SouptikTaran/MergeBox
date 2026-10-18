@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+package-lock.json
+next-env.d.ts
+test-results
+playwright-report
+# Keep registry-owned source in its original format.
+src/components/ui
+src/components/reui
+src/components/examples
+src/hooks/use-mobile.ts
