@@ -12,7 +12,8 @@ PRD. The working product name is DrivePool; the repository remains MergeBox.
 Keep Express 5 and TypeScript, Neon PostgreSQL, and Drizzle ORM. The existing
 Next.js frontend consumes the backend. Use only `DATABASE_URL` for the application
 and Drizzle tooling. Introduce Redis and workers with v0.2, when persistent sync
-jobs become necessary. Hosting, domain, and KMS provider remain undecided.
+jobs become necessary. Hosting and domain remain undecided. Refresh tokens use
+AES-256-GCM with a server-side environment key; no Google KMS integration.
 
 Complete and test one feature, update its checklist, then create one focused
 commit. Include schema migrations, API contracts, tests, and documentation with

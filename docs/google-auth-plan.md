@@ -72,11 +72,13 @@ Prevent duplicate connections using Google subject. Proposed v0.1 policy: one Go
 Drive subject belongs to one DrivePool user; return a conflict if already linked
 elsewhere, without disclosing the other user. Confirm that policy before team plans.
 
-Encrypt refresh tokens using authenticated envelope encryption: a per-record data
-key, KMS-wrapped key, nonce, authentication tag, and key version. Bind ciphertext to
-user/account IDs as associated data. Keep decryption behind one service, redact
-provider responses, and never return tokens to the frontend. Choose the KMS provider
-before implementing token storage. A local test key is not production KMS.
+Encrypt refresh tokens using AES-256-GCM with a fresh random nonce per encryption.
+Bind ciphertext to user/account IDs as associated data. Keep the 32-byte key in
+`TOKEN_ENCRYPTION_KEY` in the ignored backend environment or deployment secret store,
+separate from database records. Keep decryption behind one service, redact provider
+responses, and never return tokens to the frontend. Google KMS is not used.
+Preserve the key across restarts and deployments. Key rotation requires decrypting
+existing records with the old key and re-encrypting them before replacing it.
 
 Disconnect immediately disables account use, clears cached metadata, and attempts
 provider revocation. If revocation fails transiently, retain only the encrypted
@@ -136,7 +138,7 @@ implementing account linking. Document exact production URLs after hosting is ch
 Planned backend variables: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `APP_ORIGIN`
 (development `http://localhost:3000`), `API_ORIGIN` (development
 `http://localhost:8000`), and `NODE_ENV`, in addition to the existing `DATABASE_URL`
-and `PORT`. Add KMS configuration with Drive linking. Secrets belong only in ignored
+and `PORT`. Drive linking also uses `TOKEN_ENCRYPTION_KEY`. Secrets belong only in ignored
 `backend/.env` or the deployment secret store, not chat, Git, or frontend variables.
 
 ## Sign-in acceptance checklist
@@ -155,4 +157,4 @@ and `PORT`. Add KMS configuration with Drive linking. Secrets belong only in ign
 
 Drive linking adds tests for two accounts, ownership isolation, missing refresh
 tokens, reconnecting the wrong Google subject, denied scopes, encryption tampering,
-KMS failure, revocation failure, and disconnect cleanup.
+missing/wrong encryption keys, revocation failure, and disconnect cleanup.
