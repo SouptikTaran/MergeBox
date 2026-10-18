@@ -3,6 +3,24 @@ const assert = require("node:assert/strict");
 const { createHarness } = require("./helpers/integration.cjs");
 const h = createHarness();
 
+test("disabled Drive API reports actionable errors and unavailable totals, not zero storage", async () => {
+  const user = await login();
+  await connect(user, "api-disabled");
+  const data = await (
+    await h.request("/api/drive/storage", { headers: user.headers })
+  ).json();
+  assert.equal(data.accounts[0].error, "drive_api_disabled");
+  assert.equal(data.accounts[0].status, "active");
+  assert.equal(data.partial, true);
+  assert.equal(data.combined.total, null);
+  assert.equal(data.combined.used, null);
+  assert.equal(data.combined.free, null);
+  const files = await (
+    await h.request("/api/drive/files", { headers: user.headers })
+  ).json();
+  assert.equal(files.errors[0].code, "drive_api_disabled");
+});
+
 test("all Drive reads reject anonymous requests", async () => {
   for (const path of ["accounts", "storage", "files"])
     assert.equal((await h.request("/api/drive/" + path)).status, 401);
@@ -160,7 +178,7 @@ test("unknown shared quotas and unlimited accounts are excluded from combined to
   const data = await (
     await h.request("/api/drive/storage", { headers: user.headers })
   ).json();
-  assert.equal(data.combined.total, "0");
+  assert.equal(data.combined.total, null);
   assert.equal(data.combined.excludedAccountIds.length, 2);
   assert.equal(data.combined.complete, false);
   assert.equal(

@@ -33,7 +33,7 @@ export function OverviewPage() {
                 </FrameHeader>
                 <FramePanel>
                   <p className="text-2xl font-semibold tabular-nums">
-                    {value === undefined ? "Not available" : formatBytes(value)}
+                    {value == null ? "Storage unavailable" : formatBytes(value)}
                   </p>
                 </FramePanel>
               </Frame>

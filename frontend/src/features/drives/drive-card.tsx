@@ -88,11 +88,13 @@ export function DriveCard({ account }: { account: Account }) {
               </>
             ) : (
               <p className="text-sm text-muted-foreground">
-                {detail?.error
-                  ? "Storage could not be loaded. Reconnect if access has expired, or refresh to try again."
-                  : status === "disconnecting"
-                    ? "Local access is disabled while Google revocation is retried."
-                    : "Loading storage..."}
+                {detail?.error === "drive_api_disabled"
+                  ? "Google Drive API is disabled for this app. Enable it in the Cloud project used by the OAuth client, then refresh. No reconnection is needed."
+                  : detail?.error
+                    ? "Storage could not be loaded. Reconnect if access has expired, or refresh to try again."
+                    : status === "disconnecting"
+                      ? "Local access is disabled while Google revocation is retried."
+                      : "Loading storage..."}
               </p>
             )}
             <div className="flex flex-wrap gap-2 border-t pt-3">

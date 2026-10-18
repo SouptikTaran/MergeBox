@@ -15,9 +15,9 @@ export interface Quota {
 export interface StorageOverview {
   accounts: (Account & { quota: Quota | null; error: string | null })[];
   combined: {
-    used: string;
-    total: string;
-    free: string;
+    used: string | null;
+    total: string | null;
+    free: string | null;
     complete: boolean;
     excludedAccountIds: string[];
   };

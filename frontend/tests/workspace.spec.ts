@@ -12,6 +12,7 @@ async function backend(
     empty?: boolean;
     reconnect?: boolean;
     unavailable?: boolean;
+    disabledDriveApi?: boolean;
   } = {},
 ) {
   let signedIn = !options.anonymous;
@@ -68,6 +69,20 @@ async function backend(
     };
     if (url.pathname === "/api/drive/accounts")
       return send({ accounts: connected ? [activeAccount] : [] });
+    if (url.pathname === "/api/drive/storage" && options.disabledDriveApi)
+      return send({
+        accounts: [
+          { ...activeAccount, quota: null, error: "drive_api_disabled", fetchedAt: null },
+        ],
+        combined: {
+          used: null,
+          total: null,
+          free: null,
+          complete: false,
+          excludedAccountIds: [account.id],
+        },
+        partial: true,
+      });
     if (url.pathname === "/api/drive/storage")
       return send({
         accounts: connected
@@ -131,6 +146,18 @@ async function backend(
     },
   };
 }
+
+test("unavailable quotas never display fabricated zero capacity", async ({ page }) => {
+  await backend(page, { disabledDriveApi: true });
+  await page.goto("/");
+  await expect(
+    page.getByText("Google Drive API is disabled for this app.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Storage unavailable", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByText(/0 B/)).toHaveCount(0);
+});
 
 test("signed-out visitors cannot render any workspace route", async ({ page }) => {
   await backend(page, { anonymous: true });

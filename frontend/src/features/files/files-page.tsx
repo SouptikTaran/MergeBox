@@ -152,9 +152,11 @@ function FileBrowser({ initialAccount }: { initialAccount: string }) {
                         {accounts.find((a) => a.id === e.accountId)?.email ??
                           "Drive account"}
                         :{" "}
-                        {e.code === "reconnect_required"
-                          ? "Reconnect this drive on the Connected drives page."
-                          : "Unable to load files; refresh or narrow the account selection."}
+                        {e.code === "drive_api_disabled"
+                          ? "Google Drive API is disabled for this app. Enable it in the OAuth client's Cloud project, then refresh."
+                          : e.code === "reconnect_required"
+                            ? "Reconnect this drive on the Connected drives page."
+                            : "Unable to load files; refresh or narrow the account selection."}
                       </p>
                     ))}
                   </div>

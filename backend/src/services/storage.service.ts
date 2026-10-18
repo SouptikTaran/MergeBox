@@ -1,14 +1,14 @@
-import type { DriveRepository } from '../db/drive.repository';
-import type { DriveApi } from './drive-api.service';
-import { mapConcurrent } from '../utils/async.util';
-import { HttpError } from '../utils/http-error.util';
+import type { DriveRepository } from "../db/drive.repository";
+import type { DriveApi } from "./drive-api.service";
+import { mapConcurrent } from "../utils/async.util";
+import { HttpError } from "../utils/http-error.util";
 
 function bytes(value: unknown): bigint {
-  if (typeof value !== 'string' || !/^\d+$/.test(value))
+  if (typeof value !== "string" || !/^\d+$/.test(value))
     throw new HttpError(
       503,
-      'invalid_quota',
-      'Google returned invalid storage information.',
+      "invalid_quota",
+      "Google returned invalid storage information.",
     );
   return BigInt(value);
 }
@@ -18,19 +18,19 @@ export function createStorageService(
 ) {
   async function overview(userId: string) {
     const connected = (await repository.list(userId)).filter(
-      (account) => account.status !== 'disconnecting',
+      (account) => account.status !== "disconnecting",
     );
     const accounts = await mapConcurrent(connected, 3, async (account) => {
       try {
-        const data = await api.get(userId, account.id, 'about', {
-          fields: 'storageQuota',
+        const data = await api.get(userId, account.id, "about", {
+          fields: "storageQuota",
         });
         const quota = data.storageQuota as Record<string, unknown> | undefined;
         if (!quota)
           throw new HttpError(
             503,
-            'invalid_quota',
-            'Google returned no storage information.',
+            "invalid_quota",
+            "Google returned no storage information.",
           );
         const used = bytes(quota.usage),
           driveUsed = bytes(quota.usageInDrive),
@@ -38,15 +38,15 @@ export function createStorageService(
         const total = quota.limit === undefined ? null : bytes(quota.limit);
         const capacityKind =
           total === null
-            ? 'unlimited'
+            ? "unlimited"
             : /@(gmail\.com|googlemail\.com)$/i.test(account.email)
-              ? 'personal'
-              : 'unverified';
+              ? "personal"
+              : "unverified";
         const free = total === null ? null : total > used ? total - used : 0n;
         return {
           id: account.id,
           email: account.email,
-          status: 'active',
+          status: "active",
           quota: {
             used: used.toString(),
             total: total?.toString() ?? null,
@@ -54,18 +54,18 @@ export function createStorageService(
             driveUsed: driveUsed.toString(),
             trashUsed: trashUsed.toString(),
             capacityKind,
-            includedInTotal: capacityKind === 'personal',
+            includedInTotal: capacityKind === "personal",
           },
           error: null,
           fetchedAt: new Date().toISOString(),
         };
       } catch (error) {
         const code =
-          error instanceof HttpError ? error.code : 'service_unavailable';
+          error instanceof HttpError ? error.code : "service_unavailable";
         return {
           id: account.id,
           email: account.email,
-          status: code === 'reconnect_required' ? 'reconnect' : account.status,
+          status: code === "reconnect_required" ? "reconnect" : account.status,
           quota: null,
           error: code,
           fetchedAt: null,
@@ -83,12 +83,14 @@ export function createStorageService(
         free += BigInt(account.quota.free!);
       } else excludedAccountIds.push(account.id);
     }
+    const unavailable =
+      accounts.length > 0 && excludedAccountIds.length === accounts.length;
     return {
       accounts,
       combined: {
-        used: used.toString(),
-        total: total.toString(),
-        free: free.toString(),
+        used: unavailable ? null : used.toString(),
+        total: unavailable ? null : total.toString(),
+        free: unavailable ? null : free.toString(),
         excludedAccountIds,
         complete: excludedAccountIds.length === 0,
       },

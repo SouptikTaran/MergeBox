@@ -1,17 +1,17 @@
-import type { DriveRepository } from '../db/drive.repository';
-import type { DriveAccess } from './drive-access.service';
-import { HttpError } from '../utils/http-error.util';
+import type { DriveRepository } from "../db/drive.repository";
+import type { DriveAccess } from "./drive-access.service";
+import { HttpError } from "../utils/http-error.util";
 
 export function createDriveApi(
   access: DriveAccess,
   repository: DriveRepository,
-  baseUrl = 'https://www.googleapis.com/drive/v3',
+  baseUrl = "https://www.googleapis.com/drive/v3",
   timeoutMs = 10_000,
 ) {
   async function get(
     userId: string,
     accountId: string,
-    path: 'about' | 'files',
+    path: "about" | "files",
     params: Record<string, string>,
   ): Promise<Record<string, unknown>> {
     const url = new URL(`${baseUrl}/${path}`);
@@ -23,14 +23,14 @@ export function createDriveApi(
       try {
         response = await fetch(url, {
           headers: { Authorization: `Bearer ${token}` },
-          redirect: 'error',
+          redirect: "error",
           signal: AbortSignal.timeout(timeoutMs),
         });
       } catch {
         throw new HttpError(
           503,
-          'provider_unavailable',
-          'Google Drive is temporarily unavailable.',
+          "provider_unavailable",
+          "Google Drive is temporarily unavailable.",
         );
       }
       const data = (await response.json().catch(() => null)) as Record<
@@ -40,15 +40,15 @@ export function createDriveApi(
       if (
         response.ok &&
         data &&
-        typeof data === 'object' &&
+        typeof data === "object" &&
         !Array.isArray(data)
       ) {
         const current = await repository.get(userId, accountId);
-        if (!current || current.status !== 'active')
+        if (!current || current.status !== "active")
           throw new HttpError(
             409,
-            'account_changed',
-            'The connected account changed.',
+            "account_changed",
+            "The connected account changed.",
           );
         return data;
       }
@@ -60,23 +60,38 @@ export function createDriveApi(
       const reason = (
         data?.error as { errors?: { reason?: string }[] } | undefined
       )?.errors?.[0]?.reason;
+      const details = (
+        data?.error as { details?: { reason?: string }[] } | undefined
+      )?.details;
+      if (
+        response.status === 403 &&
+        (reason === "accessNotConfigured" ||
+          (Array.isArray(details) &&
+            details.some((detail) => detail.reason === "SERVICE_DISABLED")))
+      ) {
+        throw new HttpError(
+          503,
+          "drive_api_disabled",
+          "Enable the Google Drive API in the Cloud project used by the OAuth client, then refresh.",
+        );
+      }
       if (
         response.status === 401 ||
-        (response.status === 403 && reason === 'insufficientPermissions')
+        (response.status === 403 && reason === "insufficientPermissions")
       ) {
         await repository.markReconnect(userId, accountId);
         throw new HttpError(
           409,
-          'reconnect_required',
-          'Reconnect this Google Drive account.',
+          "reconnect_required",
+          "Reconnect this Google Drive account.",
         );
       }
       if (
         attempt < 2 &&
         (response.status === 429 ||
           response.status >= 500 ||
-          reason === 'userRateLimitExceeded' ||
-          reason === 'rateLimitExceeded')
+          reason === "userRateLimitExceeded" ||
+          reason === "rateLimitExceeded")
       ) {
         await new Promise((resolve) =>
           setTimeout(
@@ -89,15 +104,15 @@ export function createDriveApi(
       throw new HttpError(
         503,
         response.status === 429
-          ? 'provider_rate_limited'
-          : 'provider_unavailable',
-        'Google Drive could not complete the request.',
+          ? "provider_rate_limited"
+          : "provider_unavailable",
+        "Google Drive could not complete the request.",
       );
     }
     throw new HttpError(
       503,
-      'provider_unavailable',
-      'Google Drive could not complete the request.',
+      "provider_unavailable",
+      "Google Drive could not complete the request.",
     );
   }
   return { get };

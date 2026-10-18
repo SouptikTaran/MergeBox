@@ -125,9 +125,10 @@ paths:
                     type: object
                     required: [used, total, free, complete, excludedAccountIds]
                     properties:
-                      used: { type: string }
-                      total: { type: string }
-                      free: { type: string }
+                      used: { type: [string, "null"] }
+                      total: { type: [string, "null"] }
+                      free: { type: [string, "null"] }
+                      # Null totals mean accounts exist but none has usable personal quota. Empty account lists retain zero totals.
                       complete: { type: boolean }
                       excludedAccountIds:
                         { type: array, items: { type: string, format: uuid } }

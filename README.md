@@ -39,6 +39,13 @@ retains encrypted credentials for at most 24 hours, then removes them even if Go
 is unavailable. Users can also revoke access directly in Google Account settings.
 An expired/revoked refresh token changes the account status to `reconnect`.
 
+If Drive reads return `drive_api_disabled`, Google reports that `drive.googleapis.com`
+is disabled in the project used by the OAuth client. Enable Google Drive API in
+that same Cloud project, allow the setting to propagate, then refresh. An existing
+valid connection does not need to be recreated. Storage totals are null when
+accounts exist but none has usable personal quota; zero is not substituted for
+unavailable quota. Partial totals include only accounts with verified capacity.
+
 Run `yarn db:migrate` from `backend/`, then `yarn dev`. Open
 `http://localhost:8000/api/auth/google` to sign in. The callback returns to the
 frontend root with an `auth` outcome. Browser API calls must use

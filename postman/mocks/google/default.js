@@ -35,6 +35,9 @@ async function body(req) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
+    if (url.pathname.startsWith('/drive/v3/') && req.headers.authorization === 'Bearer access:api-disabled') {
+      return send(res, 403, { error: { code: 403, errors: [{ reason: 'accessNotConfigured' }], details: [{ reason: 'SERVICE_DISABLED', metadata: { service: 'drive.googleapis.com' } }] } });
+    }
     if (url.pathname === '/jwks') return send(res, 200, { keys: [jwk] });
     if (url.pathname === '/drive/v3/files') {
       if (!req.headers.authorization?.startsWith('Bearer access:')) return send(res, 401, { error: { code: 401 } });

@@ -145,7 +145,9 @@ function AppSidebar() {
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">Pooled storage</span>
             <span className="text-muted-foreground">
-              {combined ? `${formatBytes(combined.free)} free` : "Not available"}
+              {combined?.free != null
+                ? `${formatBytes(combined.free)} free`
+                : "Storage unavailable"}
             </span>
           </div>
           <Progress
@@ -157,9 +159,11 @@ function AppSidebar() {
             aria-label="Combined personal storage usage"
           />
           <p className="text-xs text-muted-foreground tabular-nums">
-            {combined
+            {combined?.total != null
               ? `${formatBytes(combined.used)} of ${formatBytes(combined.total)}`
-              : "Connect a drive to see your storage"}
+              : accounts.length
+                ? "Storage could not be loaded"
+                : "Connect a drive to see your storage"}
           </p>
         </div>
         <SidebarSeparator />
