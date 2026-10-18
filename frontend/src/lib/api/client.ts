@@ -1,6 +1,32 @@
-export const API_ORIGIN = (
-  process.env.NEXT_PUBLIC_API_ORIGIN ?? "http://localhost:8000"
-).replace(/\/$/, "");
+function readApiOrigin(): string {
+  const value = process.env.NEXT_PUBLIC_API_ORIGIN?.trim();
+  if (!value) {
+    throw new Error(
+      "Set NEXT_PUBLIC_API_ORIGIN in frontend/.env.local or the deployment environment before building.",
+    );
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("NEXT_PUBLIC_API_ORIGIN must be a valid HTTP or HTTPS origin.");
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error(
+      "NEXT_PUBLIC_API_ORIGIN must be an HTTP or HTTPS origin without credentials, a path, query, or fragment.",
+    );
+  }
+  return url.origin;
+}
+
+export const API_ORIGIN = readApiOrigin();
 
 export class ApiError extends Error {
   constructor(

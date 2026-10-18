@@ -42,8 +42,22 @@ There is no fallback to fabricated accounts, quotas or files.
 ## Authentication setup
 
 Start the backend on port 8000 and configure its Google OAuth credentials.
-Optionally set `NEXT_PUBLIC_API_ORIGIN` in an ignored `.env.local` (default localhost:8000).
-The backend `APP_ORIGIN` must match the frontend origin.
+Copy `.env.example` to `.env.local` and set the required backend origin:
+
+```dotenv
+NEXT_PUBLIC_API_ORIGIN=http://localhost:8000
+```
+
+All API requests and Google sign-in links use this value; there is no hardcoded
+fallback. Use an origin without an `/api` path. For production, set it to your
+HTTPS backend origin in the hosting environment **before building**. Next.js
+embeds `NEXT_PUBLIC_` values at build time: restart the development server after
+changes, or rebuild and redeploy production.
+
+Set `API_ORIGIN` in `backend/.env` to the same backend origin so OAuth callbacks
+match. The backend `APP_ORIGIN` must match the frontend origin for CORS and CSRF.
+Register both callback URLs for that backend origin in Google Cloud. The public
+frontend variable contains only the backend address, never credentials.
 
 - `GET /api/auth/google`: full browser navigation for new and returning users.
 - `GET /api/auth/me`: credentialed, uncached session request.
