@@ -2,6 +2,10 @@
 
 Version `0.0.0` baseline with an Express backend and a Next.js frontend.
 
+DrivePool v0.1 planning: [backend release plan](docs/backend-plan.md) and
+[Google authentication plan](docs/google-auth-plan.md). Complete and commit one
+feature at a time; push when the full version passes its release gates.
+
 ## Backend
 
 ```sh
