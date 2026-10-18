@@ -5,12 +5,93 @@ info:
 servers:
   - url: http://localhost:8000
 paths:
+  /api/drive/files:
+    get:
+      operationId: listDriveFiles
+      security: [{ session: [] }]
+      description: Owned, non-trashed files from connected accounts. Sort applies to the entire collected library. Listings are bounded to 100000 files and a two-minute scan; account failures produce partial results and errors. Five-minute in-memory cursors are scoped to the user and original query. Restart after 409 or 410. Shared-with-me and shared-drive files are not included.
+      parameters:
+        - { name: accountId, in: query, schema: { type: string, format: uuid } }
+        - {
+            name: sort,
+            in: query,
+            schema:
+              { enum: [name, size, modifiedTime, mimeType], default: name },
+          }
+        - {
+            name: direction,
+            in: query,
+            schema: { enum: [asc, desc], default: asc },
+          }
+        - {
+            name: pageSize,
+            in: query,
+            schema: { type: integer, minimum: 1, maximum: 200, default: 50 },
+          }
+        - {
+            name: pageToken,
+            in: query,
+            schema: { type: string, maxLength: 100 },
+          }
+      responses:
+        "200":
+          description: File metadata only; byte sizes are decimal strings or null. Links are HTTPS Google Drive or Docs URLs. total counts successfully listed accounts only.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [files, total, nextPageToken, partial, errors, fetchedAt]
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        [
+                          id,
+                          name,
+                          mimeType,
+                          size,
+                          modifiedTime,
+                          webViewLink,
+                          accountId,
+                          accountEmail,
+                        ]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        mimeType: { type: string }
+                        size: { type: [string, "null"] }
+                        modifiedTime:
+                          { type: [string, "null"], format: date-time }
+                        webViewLink: { type: [string, "null"], format: uri }
+                        accountId: { type: string, format: uuid }
+                        accountEmail: { type: string }
+                  total: { type: integer }
+                  nextPageToken: { type: [string, "null"] }
+                  partial: { type: boolean }
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        accountId: { type: string, format: uuid }
+                        code: { type: string }
+                  fetchedAt: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "410": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/storage:
     get:
       operationId: storageOverview
       security: [{ session: [] }]
       responses:
-        '200':
+        "200":
           description: Per-account quotas and combined finite personal-account totals. All byte values are decimal strings; missing limits are null. Free space uses total usage across Google services. Non-Gmail domains, unknown/unlimited quotas and failed accounts are excluded from combined totals. partial indicates upstream failures; combined.complete is false when any account is excluded.
           content:
             application/json:
@@ -28,17 +109,18 @@ paths:
                         email: { type: string }
                         status: { type: string }
                         quota:
-                          type: [object, 'null']
+                          type: [object, "null"]
                           properties:
                             used: { type: string, pattern: '^\d+$' }
-                            total: { type: [string, 'null'] }
-                            free: { type: [string, 'null'] }
+                            total: { type: [string, "null"] }
+                            free: { type: [string, "null"] }
                             driveUsed: { type: string }
                             trashUsed: { type: string }
-                            capacityKind: { enum: [personal, unverified, unlimited] }
+                            capacityKind:
+                              { enum: [personal, unverified, unlimited] }
                             includedInTotal: { type: boolean }
-                        error: { type: [string, 'null'] }
-                        fetchedAt: { type: [string, 'null'], format: date-time }
+                        error: { type: [string, "null"] }
+                        fetchedAt: { type: [string, "null"], format: date-time }
                   combined:
                     type: object
                     required: [used, total, free, complete, excludedAccountIds]
@@ -47,31 +129,48 @@ paths:
                       total: { type: string }
                       free: { type: string }
                       complete: { type: boolean }
-                      excludedAccountIds: { type: array, items: { type: string, format: uuid } }
+                      excludedAccountIds:
+                        { type: array, items: { type: string, format: uuid } }
                   partial: { type: boolean }
-        '401': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/accounts/{id}:
     delete:
       operationId: disconnectDriveAccount
       security: [{ session: [] }]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
         - { name: Origin, in: header, required: true, schema: { type: string } }
-        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+        - {
+            name: X-CSRF-Token,
+            in: header,
+            required: true,
+            schema: { type: string },
+          }
       responses:
-        '204': { description: Account removed or already absent. Google files are never deleted. }
-        '202': { description: Access disabled immediately; encrypted credentials retained for revocation retries for at most 24 hours. User may manually revoke in Google Account settings. }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "204":
+          {
+            description: Account removed or already absent. Google files are never deleted.,
+          }
+        "202":
+          {
+            description: Access disabled immediately; encrypted credentials retained for revocation retries for at most 24 hours. User may manually revoke in Google Account settings.,
+          }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/accounts:
     get:
       operationId: listDriveAccounts
       security: [{ session: [] }]
       responses:
-        '200':
+        "200":
           description: Connected accounts owned by the session user. Credentials are never returned.
           content:
             application/json:
@@ -89,17 +188,22 @@ paths:
                         email: { type: string }
                         status: { enum: [active, reconnect, disconnecting] }
                         createdAt: { type: string, format: date-time }
-        '401': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/accounts/connect:
     post:
       operationId: connectDriveAccount
       security: [{ session: [] }]
       parameters:
         - { name: Origin, in: header, required: true, schema: { type: string } }
-        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+        - {
+            name: X-CSRF-Token,
+            in: header,
+            required: true,
+            schema: { type: string },
+          }
       responses:
-        '200':
+        "200":
           description: Sets the HttpOnly browser-binding cookie. Navigate the browser to authorizationUrl.
           content:
             application/json:
@@ -108,25 +212,36 @@ paths:
                 required: [authorizationUrl]
                 properties:
                   authorizationUrl: { type: string, format: uri }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '429': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/accounts/{id}/reconnect:
     post:
       operationId: reconnectDriveAccount
       security: [{ session: [] }]
       parameters:
-        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - {
+            name: id,
+            in: path,
+            required: true,
+            schema: { type: string, format: uuid },
+          }
         - { name: Origin, in: header, required: true, schema: { type: string } }
-        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string } }
+        - {
+            name: X-CSRF-Token,
+            in: header,
+            required: true,
+            schema: { type: string },
+          }
       responses:
-        '200': { description: Authorization URL and browser-binding cookie, as for connect. Callback must match the existing Google subject. }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '429': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "200":
+          description: Authorization URL and browser-binding cookie, as for connect. Callback must match the existing Google subject.
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/drive/oauth/callback:
     get:
       operationId: driveOAuthCallback
@@ -136,22 +251,23 @@ paths:
         - { name: code, in: query, schema: { type: string } }
         - { name: error, in: query, schema: { type: string } }
       responses:
-        '303': { description: Redirect to APP_ORIGIN/?drive=connected or a safe outcome (invalid_state, invalid_code, invalid_identity, consent_denied, provider_unavailable, missing_scope, reconnect_required, wrong_account, account_conflict). Requires the initiating session and browser-binding cookie. }
-        '401': { $ref: '#/components/responses/Error' }
-        '429': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "303":
+          description: Redirect to APP_ORIGIN/?drive=connected or a safe error outcome. Requires the initiating session and browser-binding cookie.
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/auth/google:
     get:
       operationId: googleSignIn
       description: Start Google sign-in with PKCE, state and a browser-binding cookie. No Drive scopes are requested.
       responses:
-        '302':
+        "302":
           description: Redirect to Google. Sets a 10-minute HttpOnly, SameSite=Lax OAuth cookie.
           headers:
             Location:
               schema: { type: string, format: uri }
-        '429': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/auth/google/callback:
     get:
       operationId: googleCallback
@@ -161,19 +277,19 @@ paths:
         - { name: code, in: query, schema: { type: string } }
         - { name: error, in: query, schema: { type: string } }
       responses:
-        '303':
+        "303":
           description: Redirect to APP_ORIGIN/?auth=success or a safe failure code (invalid_state, invalid_code, invalid_identity, consent_denied, provider_unavailable). Success sets the session cookie; the OAuth cookie is cleared.
           headers:
             Location:
               schema: { type: string, format: uri }
-        '429': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "429": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/auth/me:
     get:
       operationId: currentUser
       security: [{ session: [] }]
       responses:
-        '200':
+        "200":
           description: Safe profile and session-bound CSRF token. Cache-Control is no-store.
           content:
             application/json:
@@ -187,24 +303,36 @@ paths:
                     properties:
                       id: { type: string, format: uuid }
                       email: { type: string }
-                      name: { type: [string, 'null'] }
-                      avatarUrl: { type: [string, 'null'] }
+                      name: { type: [string, "null"] }
+                      avatarUrl: { type: [string, "null"] }
                       plan: { type: string }
                   csrfToken: { type: string }
-        '401': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "401": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
   /api/auth/logout:
     post:
       operationId: logout
       security: [{ session: [] }]
       parameters:
-        - { name: Origin, in: header, required: true, schema: { type: string }, description: Must equal APP_ORIGIN. }
-        - { name: X-CSRF-Token, in: header, required: true, schema: { type: string }, description: CSRF token returned by /api/auth/me. }
+        - {
+            name: Origin,
+            in: header,
+            required: true,
+            schema: { type: string },
+            description: Must equal APP_ORIGIN.,
+          }
+        - {
+            name: X-CSRF-Token,
+            in: header,
+            required: true,
+            schema: { type: string },
+            description: CSRF token returned by /api/auth/me.,
+          }
       responses:
-        '204': { description: Session deleted and cookie cleared. }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '503': { $ref: '#/components/responses/Error' }
+        "204": { description: Session deleted and cookie cleared. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:

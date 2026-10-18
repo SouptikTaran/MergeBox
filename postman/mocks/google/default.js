@@ -36,6 +36,16 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/jwks') return send(res, 200, { keys: [jwk] });
+    if (url.pathname === '/drive/v3/files') {
+      if (!req.headers.authorization?.startsWith('Bearer access:')) return send(res, 401, { error: { code: 401 } });
+      const subject = req.headers.authorization.slice('Bearer access:'.length);
+      if (subject === 'files-outage') return send(res, 503, { error: { code: 503 } });
+      if (url.searchParams.get('q') !== "'me' in owners and trashed = false") return send(res, 400, { error: { code: 400 } });
+      const file = (id, name, size, link = 'https://drive.google.com/file/d/' + id + '/view') => ({ id, name, mimeType: size ? 'application/pdf' : 'application/vnd.google-apps.document', ...(size ? { size } : {}), modifiedTime: '2026-10-18T10:00:00Z', webViewLink: link });
+      if (subject === 'files-empty') return send(res, 200, { files: [] });
+      if (url.searchParams.has('pageToken')) return send(res, 200, { files: [file('a', 'Alpha', '9007199254740993'), file('z', 'Zebra', '42'), file('n', 'Native document', null, 'javascript:alert(1)')] });
+      return send(res, 200, { files: [file('z', 'Zebra', '42')], nextPageToken: 'page-two' });
+    }
     if (url.pathname === '/drive/v3/about') {
       const subject = (req.headers.authorization || '').replace(
         'Bearer access:',

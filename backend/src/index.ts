@@ -1,13 +1,14 @@
-import { createApp } from './app';
-import { readAuthConfig } from './config/auth.config';
-import { createGoogleProvider } from './services/google.service';
-import { createAuthStore } from './db/auth.repository';
-import { closeDatabase, db } from './db';
-import { createDriveRepository } from './db/drive.repository';
-import { configuredTokenEncryption } from './services/token-encryption.service';
-import { createDriveAccess } from './services/drive-access.service';
-import { createDriveApi } from './services/drive-api.service';
-import { createStorageService } from './services/storage.service';
+import { createApp } from "./app";
+import { readAuthConfig } from "./config/auth.config";
+import { createGoogleProvider } from "./services/google.service";
+import { createAuthStore } from "./db/auth.repository";
+import { closeDatabase, db } from "./db";
+import { createDriveRepository } from "./db/drive.repository";
+import { configuredTokenEncryption } from "./services/token-encryption.service";
+import { createDriveAccess } from "./services/drive-access.service";
+import { createDriveApi } from "./services/drive-api.service";
+import { createStorageService } from "./services/storage.service";
+import { createFileBrowser } from "./services/file-browser.service";
 
 const config = readAuthConfig();
 const store = createAuthStore(db);
@@ -15,16 +16,19 @@ const driveRepository = createDriveRepository(db);
 const encryption = configuredTokenEncryption();
 const driveAccess = createDriveAccess(driveRepository, encryption, config);
 const driveApi = createDriveApi(driveAccess, driveRepository);
+const files = createFileBrowser(driveRepository, driveApi);
+driveAccess.onDisconnect(files.clear);
 const app = createApp(store, createGoogleProvider(config), config, {
   repository: driveRepository,
-  google: createGoogleProvider(config, undefined, undefined, 'drive'),
+  google: createGoogleProvider(config, undefined, undefined, "drive"),
   encryption,
   access: driveAccess,
   storage: createStorageService(driveRepository, driveApi),
+  files,
 });
 const port = Number(process.env.PORT || 8000);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
-  throw new Error('PORT must be between 1 and 65535.');
+  throw new Error("PORT must be between 1 and 65535.");
 
 const server = app.listen(port, () => {
   console.log(`Backend Started: http://localhost:${port}`);
@@ -33,7 +37,7 @@ const server = app.listen(port, () => {
 const cleanup = setInterval(
   () => {
     store.cleanup().catch(() => {
-      console.error('Expired authentication data cleanup failed.');
+      console.error("Expired authentication data cleanup failed.");
     });
   },
   15 * 60 * 1000,
@@ -41,12 +45,13 @@ const cleanup = setInterval(
 cleanup.unref();
 let retryingDisconnects = false;
 const disconnectCleanup = setInterval(() => {
+  files.cleanup();
   if (retryingDisconnects) return;
   retryingDisconnects = true;
   driveAccess
     .retryDisconnects()
     .catch(() => {
-      console.error('Drive revocation retry failed.');
+      console.error("Drive revocation retry failed.");
     })
     .finally(() => {
       retryingDisconnects = false;
@@ -73,5 +78,5 @@ function shutdown() {
       });
   });
 }
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

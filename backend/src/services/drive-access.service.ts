@@ -1,11 +1,11 @@
-import type { AuthConfig } from '../config/auth.config';
-import type { DriveAccount, DriveRepository } from '../db/drive.repository';
-import type { TokenEncryption } from './token-encryption.service';
-import { HttpError } from '../utils/http-error.util';
+import type { AuthConfig } from "../config/auth.config";
+import type { DriveAccount, DriveRepository } from "../db/drive.repository";
+import type { TokenEncryption } from "./token-encryption.service";
+import { HttpError } from "../utils/http-error.util";
 
 const ENDPOINTS = {
-  token: 'https://oauth2.googleapis.com/token',
-  revoke: 'https://oauth2.googleapis.com/revoke',
+  token: "https://oauth2.googleapis.com/token",
+  revoke: "https://oauth2.googleapis.com/revoke",
 };
 export function createDriveAccess(
   repository: DriveRepository,
@@ -19,6 +19,7 @@ export function createDriveAccess(
     { value: string; expiresAt: number; grant: string }
   >();
   const refreshes = new Map<string, Promise<string>>();
+  const disconnectListeners = new Set<(userId: string) => void>();
   const decrypt = (account: DriveAccount) =>
     encryption.decrypt(
       account.encryptedRefreshToken,
@@ -27,16 +28,16 @@ export function createDriveAccess(
   async function post(url: string, body: URLSearchParams) {
     try {
       return await fetch(url, {
-        method: 'POST',
+        method: "POST",
         body,
-        redirect: 'error',
+        redirect: "error",
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new HttpError(
         503,
-        'provider_unavailable',
-        'Google is temporarily unavailable.',
+        "provider_unavailable",
+        "Google is temporarily unavailable.",
       );
     }
   }
@@ -44,7 +45,7 @@ export function createDriveAccess(
     const response = await post(
       endpoints.token,
       new URLSearchParams({
-        grant_type: 'refresh_token',
+        grant_type: "refresh_token",
         refresh_token: await decrypt(account),
         client_id: config.clientId,
         client_secret: config.clientSecret,
@@ -56,44 +57,44 @@ export function createDriveAccess(
       expires_in?: number;
     };
     if (!response.ok) {
-      if (data.error === 'invalid_grant') {
+      if (data.error === "invalid_grant") {
         tokens.delete(account.id);
         await repository.markReconnect(account.userId, account.id);
         throw new HttpError(
           409,
-          'reconnect_required',
-          'Reconnect this Google Drive account.',
+          "reconnect_required",
+          "Reconnect this Google Drive account.",
         );
       }
       throw new HttpError(
         503,
-        'provider_unavailable',
-        'Google is temporarily unavailable.',
+        "provider_unavailable",
+        "Google is temporarily unavailable.",
       );
     }
     if (
-      typeof data.access_token !== 'string' ||
+      typeof data.access_token !== "string" ||
       !data.access_token ||
-      typeof data.expires_in !== 'number' ||
+      typeof data.expires_in !== "number" ||
       !Number.isFinite(data.expires_in) ||
       data.expires_in <= 0
     ) {
       throw new HttpError(
         503,
-        'invalid_provider_response',
-        'Google returned an invalid response.',
+        "invalid_provider_response",
+        "Google returned an invalid response.",
       );
     }
     const current = await repository.get(account.userId, account.id);
     if (
       !current ||
-      current.status !== 'active' ||
+      current.status !== "active" ||
       current.encryptedRefreshToken !== account.encryptedRefreshToken
     ) {
       throw new HttpError(
         409,
-        'account_changed',
-        'The connected account changed. Refresh and try again.',
+        "account_changed",
+        "The connected account changed. Refresh and try again.",
       );
     }
     if (tokens.size >= 1000) tokens.delete(tokens.keys().next().value!);
@@ -106,13 +107,13 @@ export function createDriveAccess(
   }
   async function accessToken(userId: string, id: string): Promise<string> {
     const account = await repository.get(userId, id);
-    if (!account || account.status === 'disconnecting')
-      throw new HttpError(404, 'account_not_found', 'Account not found.');
-    if (account.status === 'reconnect')
+    if (!account || account.status === "disconnecting")
+      throw new HttpError(404, "account_not_found", "Account not found.");
+    if (account.status === "reconnect")
       throw new HttpError(
         409,
-        'reconnect_required',
-        'Reconnect this Google Drive account.',
+        "reconnect_required",
+        "Reconnect this Google Drive account.",
       );
     const cached = tokens.get(id);
     if (
@@ -142,7 +143,7 @@ export function createDriveAccess(
         : ((await response.json().catch(() => ({}))) as { error?: string });
       if (
         !response.ok &&
-        !(response.status === 400 && error?.error === 'invalid_token')
+        !(response.status === 400 && error?.error === "invalid_token")
       )
         return false;
       await repository.remove(account.userId, account.id);
@@ -153,6 +154,7 @@ export function createDriveAccess(
   }
   async function disconnect(userId: string, id: string) {
     const account = await repository.beginDisconnect(userId, id);
+    for (const listener of disconnectListeners) listener(userId);
     if (!account) return true;
     return finishDisconnect(account);
   }
@@ -166,6 +168,9 @@ export function createDriveAccess(
     }
   }
   return {
+    onDisconnect: (listener: (userId: string) => void) => {
+      disconnectListeners.add(listener);
+    },
     accessToken,
     disconnect,
     retryDisconnects,

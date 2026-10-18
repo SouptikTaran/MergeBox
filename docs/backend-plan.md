@@ -38,7 +38,7 @@ their login account or another Google account explicitly.
 | 2 | Connect multiple Drive accounts, 0.1-2, 0.1-3, 0.1-7 | Two distinct accounts attached to one user, encrypted refresh tokens, ownership checks, denied consent | Implemented; local integration tests pass; live consent pending |
 | 3 | Disconnect and reconnect, 0.1-3, 0.1-8 | Revocation, local metadata cleanup, missing/expired refresh token, repeat disconnect | Implemented; local integration tests pass |
 | 4 | Per-account and combined storage, 0.1-4 | Byte-accurate quota parsing, unknown limits, shared quota exclusions, partial failures | Implemented; local integration tests pass; live quota comparison pending |
-| 5 | Unified files and Drive links, 0.1-5, 0.1-6 | Global sorting across paginated accounts, filters, links, no cross-user exposure | Planned |
+| 5 | Unified files and Drive links, 0.1-5, 0.1-6 | Global sorting across paginated accounts, filters, links, no cross-user exposure | Implemented; 45 backend tests pass including file isolation, pagination, partial failures and disconnect invalidation |
 | 6 | Release integration and privacy, 0.1-7 | Privacy notice, redacted logs, real two-account flow, frontend integration, release checklist | Planned |
 
 For each API feature, define the request/response contract before implementation.
@@ -46,10 +46,12 @@ Use bounded pagination, consistent error codes, and ownership checks at the data
 access layer. Return large byte counts as decimal strings to avoid JavaScript
 integer precision loss. Tests should cover failure paths as well as success.
 
-The v0.1 file browser uses live Drive requests with bounded caching. A global sort
-must merge sorted streams from each account and retain each upstream cursor and
-unused page items; sorting only the currently fetched pages is incorrect. Bind
-opaque cursors to the user, account selection, sort, and expiration. Return
+The v0.1 file browser collects owned metadata from each account before globally
+sorting a bounded in-memory snapshot (100,000 files, two-minute collection deadline,
+five snapshots per process, five-minute expiry). This supports exact size sorting,
+which differs from Google's quota-bytes sort. First-page latency depends on library
+size; a persistent index remains v0.2 work. Cursors bind to user, account selection,
+sort, page size and expiration. Disconnect clears the user's snapshots. Return
 per-account errors with partial results, never present an incomplete list as full.
 Keep persistent file indexing for v0.2. Start with owned My Drive files; shared
 drives and shared-with-me files need a separate product decision and labeling.
