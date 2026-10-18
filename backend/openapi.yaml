@@ -5,6 +5,52 @@ info:
 servers:
   - url: http://localhost:8000
 paths:
+  /api/drive/storage:
+    get:
+      operationId: storageOverview
+      security: [{ session: [] }]
+      responses:
+        '200':
+          description: Per-account quotas and combined finite personal-account totals. All byte values are decimal strings; missing limits are null. Free space uses total usage across Google services. Non-Gmail domains, unknown/unlimited quotas and failed accounts are excluded from combined totals. partial indicates upstream failures; combined.complete is false when any account is excluded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accounts, combined, partial]
+                properties:
+                  accounts:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, email, status, quota, error, fetchedAt]
+                      properties:
+                        id: { type: string, format: uuid }
+                        email: { type: string }
+                        status: { type: string }
+                        quota:
+                          type: [object, 'null']
+                          properties:
+                            used: { type: string, pattern: '^\d+$' }
+                            total: { type: [string, 'null'] }
+                            free: { type: [string, 'null'] }
+                            driveUsed: { type: string }
+                            trashUsed: { type: string }
+                            capacityKind: { enum: [personal, unverified, unlimited] }
+                            includedInTotal: { type: boolean }
+                        error: { type: [string, 'null'] }
+                        fetchedAt: { type: [string, 'null'], format: date-time }
+                  combined:
+                    type: object
+                    required: [used, total, free, complete, excludedAccountIds]
+                    properties:
+                      used: { type: string }
+                      total: { type: string }
+                      free: { type: string }
+                      complete: { type: boolean }
+                      excludedAccountIds: { type: array, items: { type: string, format: uuid } }
+                  partial: { type: boolean }
+        '401': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
   /api/drive/accounts/{id}:
     delete:
       operationId: disconnectDriveAccount

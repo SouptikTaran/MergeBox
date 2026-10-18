@@ -36,6 +36,33 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname === '/jwks') return send(res, 200, { keys: [jwk] });
+    if (url.pathname === '/drive/v3/about') {
+      const subject = (req.headers.authorization || '').replace(
+        'Bearer access:',
+        '',
+      );
+      if (!req.headers.authorization?.startsWith('Bearer access:'))
+        return send(res, 401, { error: { code: 401 } });
+      if (subject === 'quota-outage')
+        return send(res, 503, { error: { code: 503 } });
+      if (subject === 'quota-invalid')
+        return send(res, 200, { storageQuota: { usage: 'invalid' } });
+      return send(res, 200, {
+        storageQuota: {
+          ...(subject === 'unlimited'
+            ? {}
+            : {
+                limit:
+                  subject === 'large-quota'
+                    ? '18014398509481986'
+                    : '15000000000',
+              }),
+          usage: subject === 'large-quota' ? '9007199254740993' : '4000000000',
+          usageInDrive: '1000000000',
+          usageInDriveTrash: '10000000',
+        },
+      });
+    }
     if (url.pathname === '/authorize') {
       const p = Object.fromEntries(url.searchParams);
       if (

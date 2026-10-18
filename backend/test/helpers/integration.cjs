@@ -15,6 +15,10 @@ function createHarness() {
   const { hash, randomToken } = require('../../dist/utils/auth.util');
   const schema = require('../../dist/db/schema');
   const { createDriveRepository } = require('../../dist/db/drive.repository');
+  const { createDriveApi } = require('../../dist/services/drive-api.service');
+  const {
+    createStorageService,
+  } = require('../../dist/services/storage.service');
   const {
     createDriveAccess,
   } = require('../../dist/services/drive-access.service');
@@ -69,6 +73,15 @@ function createHarness() {
       repository: createDriveRepository(db),
       encryption,
       access,
+      storage: createStorageService(
+        createDriveRepository(db),
+        createDriveApi(
+          access,
+          createDriveRepository(db),
+          upstream + '/drive/v3',
+          600,
+        ),
+      ),
       google: createGoogleProvider(
         current,
         {

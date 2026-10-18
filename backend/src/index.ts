@@ -6,17 +6,21 @@ import { closeDatabase, db } from './db';
 import { createDriveRepository } from './db/drive.repository';
 import { configuredTokenEncryption } from './services/token-encryption.service';
 import { createDriveAccess } from './services/drive-access.service';
+import { createDriveApi } from './services/drive-api.service';
+import { createStorageService } from './services/storage.service';
 
 const config = readAuthConfig();
 const store = createAuthStore(db);
 const driveRepository = createDriveRepository(db);
 const encryption = configuredTokenEncryption();
 const driveAccess = createDriveAccess(driveRepository, encryption, config);
+const driveApi = createDriveApi(driveAccess, driveRepository);
 const app = createApp(store, createGoogleProvider(config), config, {
   repository: driveRepository,
   google: createGoogleProvider(config, undefined, undefined, 'drive'),
   encryption,
   access: driveAccess,
+  storage: createStorageService(driveRepository, driveApi),
 });
 const port = Number(process.env.PORT || 8000);
 if (!Number.isInteger(port) || port < 1 || port > 65535)

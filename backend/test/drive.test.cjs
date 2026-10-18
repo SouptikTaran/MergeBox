@@ -3,6 +3,59 @@ const assert = require('node:assert/strict');
 const { createHarness } = require('./helpers/integration.cjs');
 const h = createHarness();
 
+test('storage preserves exact bytes and uses all-service usage for free space', async () => {
+  const user = await login();
+  await connect(user, 'large-quota');
+  await connect(user, 'normal-quota');
+  await h.pg.exec(
+    "UPDATE drive_accounts SET email = google_subject || '@gmail.com'",
+  );
+  const data = await (
+    await h.request('/api/drive/storage', { headers: user.headers })
+  ).json();
+  assert.equal(
+    data.combined.total,
+    (18014398509481986n + 15000000000n).toString(),
+  );
+  assert.equal(
+    data.combined.used,
+    (9007199254740993n + 4000000000n).toString(),
+  );
+  assert.equal(
+    data.combined.free,
+    (9007199254740993n + 11000000000n).toString(),
+  );
+  assert.equal(data.combined.complete, true);
+  assert.equal(data.partial, false);
+});
+test('unknown shared quotas and unlimited accounts are excluded from combined totals', async () => {
+  const user = await login();
+  await connect(user, 'work-account');
+  await connect(user, 'unlimited');
+  const data = await (
+    await h.request('/api/drive/storage', { headers: user.headers })
+  ).json();
+  assert.equal(data.combined.total, '0');
+  assert.equal(data.combined.excludedAccountIds.length, 2);
+  assert.equal(data.combined.complete, false);
+  assert.equal(
+    data.accounts.find((a) => a.quota.capacityKind === 'unlimited').quota.total,
+    null,
+  );
+});
+test('storage reports per-account failures without losing healthy accounts', async () => {
+  const user = await login();
+  await connect(user, 'healthy');
+  await connect(user, 'quota-invalid');
+  const data = await (
+    await h.request('/api/drive/storage', { headers: user.headers })
+  ).json();
+  assert.equal(data.accounts.length, 2);
+  assert.equal(data.partial, true);
+  assert.equal(data.accounts.filter((a) => a.quota).length, 1);
+  assert.equal(data.accounts.find((a) => a.error).error, 'invalid_quota');
+});
+
 async function accountId() {
   return (await h.pg.query('SELECT id FROM drive_accounts')).rows[0].id;
 }
